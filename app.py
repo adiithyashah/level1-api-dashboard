@@ -1,25 +1,56 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+
 from src.pipeline import save_price
 from src.queries import get_latest_prices
+from src.analytics import calculate_stats
+from src.ai_insights import generate_market_insight
+from src.market_chat import ask_market_question
 
-st.title("Crypto API Dashboard")
-st_autorefresh(interval=10000, key="refresh")
 
-symbol = st.selectbox("Select coin", ["bitcoin", "ethereum"])
-currency = st.selectbox("Select currency", ["usd", "eur"])
+st.title("AI Market Intelligence Dashboard")
+
+st_autorefresh(
+    interval=10000,
+    key="refresh"
+)
+
+
+# User Inputs
+
+symbol = st.selectbox(
+    "Select Coin",
+    ["bitcoin", "ethereum"]
+)
+
+currency = st.selectbox(
+    "Select Currency",
+    ["usd", "eur"]
+)
+
+
+# Fetch Latest Price
 
 if st.button("Fetch Latest Price"):
+
     try:
         result = save_price(symbol, currency)
+
         st.success(
-            f"Saved {result['symbol']} price: {result['price']} {result['currency']}")
+            f"Saved {result['symbol']} price: {result['price']} {result['currency']}"
+        )
+
     except Exception as e:
         st.error(f"Something went wrong: {e}")
 
-st.subheader("Latest Stored Prices")
+
+# Read Data
 
 df = get_latest_prices()
+
+
+# Filter
+
 filter_symbol = st.selectbox(
     "Filter table by coin",
     ["all"] + list(df["symbol"].unique())
@@ -27,27 +58,43 @@ filter_symbol = st.selectbox(
 
 if filter_symbol != "all":
     df = df[df["symbol"] == filter_symbol]
-latest_row = df.iloc[0]
 
-col1, col2, col3 = st.columns(3)
 
-col1.metric("Latest Symbol", latest_row["symbol"])
-col2.metric("Latest Price", latest_row["price"])
-col3.metric("Currency", latest_row["currency"])
-st.dataframe(df)
-csv = df.to_csv(index=False)
+# Analytics
 
-st.download_button(
-    label="Download Data as CSV",
-    data=csv,
-    file_name="crypto_prices.csv",
-    mime="text/csv"
+stats = calculate_stats(df)
+
+st.subheader("Market Analytics")
+
+col1, col2 = st.columns(2)
+
+col1.metric("Average Price", stats["average"])
+col2.metric("Volatility", stats["volatility"])
+
+col1.metric("Highest Price", stats["highest"])
+col2.metric("Lowest Price", stats["lowest"])
+
+
+# AI Market Insight
+
+insight = generate_market_insight(
+    stats,
+    filter_symbol
 )
-st.subheader("Statistics")
 
-st.write("Average Price:", round(df["price"].mean(), 2))
-st.write("Highest Price:", df["price"].max())
-st.write("Lowest Price:", df["price"].min())
+st.subheader("AI Market Insight")
+st.info(insight)
+
+
+# Latest Stored Prices
+
+st.subheader("Latest Stored Prices")
+
+st.dataframe(df)
+
+
+# Price Trend Chart
+
 chart_df = df.sort_values("created_at")
 
 st.subheader("Price Trend")
@@ -58,3 +105,66 @@ st.line_chart(
     y="price",
     color="symbol"
 )
+
+
+# Download CSV
+
+csv = df.to_csv(index=False)
+
+st.download_button(
+    label="Download Data as CSV",
+    data=csv,
+    file_name="crypto_prices.csv",
+    mime="text/csv"
+)
+
+
+# AI Market Chat
+
+Next we make it portfolio-worthy by adding AI chat memory.
+
+Right now:
+
+Ask question → AI answers → answer disappears after refresh
+
+We want:
+
+Ask question → AI answers → chat history stays visible
+Step 1 — Update AI Chat section in app.py
+
+Replace only the AI Market Chat section with this:
+
+# -------------------------
+# AI Market Chat
+# -------------------------
+
+st.subheader("Ask AI About Market")
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+question = st.text_input("Ask a market question")
+
+if st.button("Ask AI"):
+
+    if question:
+        answer = ask_market_question(
+            question,
+            stats,
+            filter_symbol
+        )
+
+        st.session_state.chat_history.append(
+            {
+                "question": question,
+                "answer": answer
+            }
+        )
+
+    else:
+        st.warning("Please enter a question first.")
+
+for chat in st.session_state.chat_history:
+    st.write("**You:**", chat["question"])
+    st.write("**AI:**", chat["answer"])
+    st.divider()
