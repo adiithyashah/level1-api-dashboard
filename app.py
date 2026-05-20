@@ -1,8 +1,10 @@
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 from src.pipeline import save_price
 from src.queries import get_latest_prices
 
 st.title("Crypto API Dashboard")
+st_autorefresh(interval=10000, key="refresh")
 
 symbol = st.selectbox("Select coin", ["bitcoin", "ethereum"])
 currency = st.selectbox("Select currency", ["usd", "eur"])
@@ -10,7 +12,8 @@ currency = st.selectbox("Select currency", ["usd", "eur"])
 if st.button("Fetch Latest Price"):
     try:
         result = save_price(symbol, currency)
-        st.success(f"Saved {result['symbol']} price: {result['price']} {result['currency']}")
+        st.success(
+            f"Saved {result['symbol']} price: {result['price']} {result['currency']}")
     except Exception as e:
         st.error(f"Something went wrong: {e}")
 
@@ -32,9 +35,17 @@ col1.metric("Latest Symbol", latest_row["symbol"])
 col2.metric("Latest Price", latest_row["price"])
 col3.metric("Currency", latest_row["currency"])
 st.dataframe(df)
+csv = df.to_csv(index=False)
+
+st.download_button(
+    label="Download Data as CSV",
+    data=csv,
+    file_name="crypto_prices.csv",
+    mime="text/csv"
+)
 st.subheader("Statistics")
 
-st.write("Average Price:", round(df["price"].mean(),2))
+st.write("Average Price:", round(df["price"].mean(), 2))
 st.write("Highest Price:", df["price"].max())
 st.write("Lowest Price:", df["price"].min())
 chart_df = df.sort_values("created_at")
