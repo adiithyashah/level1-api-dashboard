@@ -6,6 +6,8 @@ from src.queries import get_latest_prices
 from src.analytics import calculate_stats
 from src.ai_insights import generate_market_insight
 from src.market_chat import ask_market_question
+from src.news import get_market_news
+from src.sentiment import calculate_sentiment
 
 
 st.title("AI Market Intelligence Dashboard")
@@ -16,7 +18,9 @@ st_autorefresh(
 )
 
 
+# -------------------------
 # User Inputs
+# -------------------------
 
 symbol = st.selectbox(
     "Select Coin",
@@ -29,7 +33,9 @@ currency = st.selectbox(
 )
 
 
+# -------------------------
 # Fetch Latest Price
+# -------------------------
 
 if st.button("Fetch Latest Price"):
 
@@ -44,12 +50,16 @@ if st.button("Fetch Latest Price"):
         st.error(f"Something went wrong: {e}")
 
 
-# Read Data
+# -------------------------
+# Read Data From Database
+# -------------------------
 
 df = get_latest_prices()
 
 
-# Filter
+# -------------------------
+# Filter Data
+# -------------------------
 
 filter_symbol = st.selectbox(
     "Filter table by coin",
@@ -60,9 +70,20 @@ if filter_symbol != "all":
     df = df[df["symbol"] == filter_symbol]
 
 
-# Analytics
+# -------------------------
+# Calculate Analytics
+# -------------------------
 
 stats = calculate_stats(df)
+
+news = get_market_news(filter_symbol)
+
+sentiment = calculate_sentiment(news)
+
+
+# -------------------------
+# Market Analytics Section
+# -------------------------
 
 st.subheader("Market Analytics")
 
@@ -74,8 +95,22 @@ col2.metric("Volatility", stats["volatility"])
 col1.metric("Highest Price", stats["highest"])
 col2.metric("Lowest Price", stats["lowest"])
 
+st.metric("News Sentiment", sentiment)
 
+
+# -------------------------
+# Market News Section
+# -------------------------
+
+st.subheader("Market News")
+
+for article in news:
+    st.write("•", article)
+
+
+# -------------------------
 # AI Market Insight
+# -------------------------
 
 insight = generate_market_insight(
     stats,
@@ -86,14 +121,18 @@ st.subheader("AI Market Insight")
 st.info(insight)
 
 
+# -------------------------
 # Latest Stored Prices
+# -------------------------
 
 st.subheader("Latest Stored Prices")
 
 st.dataframe(df)
 
 
+# -------------------------
 # Price Trend Chart
+# -------------------------
 
 chart_df = df.sort_values("created_at")
 
@@ -107,7 +146,9 @@ st.line_chart(
 )
 
 
+# -------------------------
 # Download CSV
+# -------------------------
 
 csv = df.to_csv(index=False)
 
@@ -118,21 +159,6 @@ st.download_button(
     mime="text/csv"
 )
 
-
-# AI Market Chat
-
-Next we make it portfolio-worthy by adding AI chat memory.
-
-Right now:
-
-Ask question → AI answers → answer disappears after refresh
-
-We want:
-
-Ask question → AI answers → chat history stays visible
-Step 1 — Update AI Chat section in app.py
-
-Replace only the AI Market Chat section with this:
 
 # -------------------------
 # AI Market Chat
