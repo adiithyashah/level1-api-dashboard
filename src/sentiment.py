@@ -5,7 +5,10 @@ def calculate_sentiment(news):
         "increasing",
         "interest",
         "improvements",
-        "higher"
+        "higher",
+        "rises",
+        "surge",
+        "bullish"
     ]
 
     negative_words = [
@@ -13,14 +16,18 @@ def calculate_sentiment(news):
         "drop",
         "loss",
         "risk",
-        "fall"
+        "fall",
+        "crash",
+        "bearish"
     ]
 
     score = 0
 
     for article in news:
 
-        text = article.lower()
+        title = article.get("title", "")
+
+        text = title.lower()
 
         for word in positive_words:
             if word in text:

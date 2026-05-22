@@ -1,5 +1,4 @@
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 
 from src.pipeline import save_price
 from src.queries import get_latest_prices
@@ -8,24 +7,65 @@ from src.ai_insights import generate_market_insight
 from src.market_chat import ask_market_question
 from src.news import get_market_news
 from src.sentiment import calculate_sentiment
+from src.credibility import check_news_credibility
+from src.news_impact import analyze_news_impact
+from src.trader_context import generate_trader_context
+from src.alert_engine import generate_bitcoin_alerts
+from src.focus_panel import build_focus_panel
+
+@st.cache_data(ttl=300)
+def cached_market_news(symbol):
+    return get_market_news(symbol)
 
 
-st.title("AI Market Intelligence Dashboard")
+@st.cache_data(ttl=300)
+def cached_market_insight(symbol, average, highest, lowest, volatility):
+    stats = {
+        "average": average,
+        "highest": highest,
+        "lowest": lowest,
+        "volatility": volatility
+    }
 
-st_autorefresh(
-    interval=10000,
-    key="refresh"
-)
+    return generate_market_insight(stats, symbol)
+
+
+@st.cache_data(ttl=600)
+def cached_news_impact(title):
+    return analyze_news_impact(title)
+
+
+@st.cache_data(ttl=300)
+def cached_trader_context(average, highest, lowest, volatility, sentiment, news):
+
+    stats = {
+        "average": average,
+        "highest": highest,
+        "lowest": lowest,
+        "volatility": volatility
+    }
+
+    return generate_trader_context(
+        stats,
+        sentiment,
+        news
+    )
+
+
+st.title("Bitcoin Intelligence Terminal")
+
+if st.button("Refresh Intelligence"):
+    st.cache_data.clear()
+    st.rerun()
 
 
 # -------------------------
 # User Inputs
 # -------------------------
 
-symbol = st.selectbox(
-    "Select Coin",
-    ["bitcoin", "ethereum"]
-)
+symbol = "bitcoin"
+
+st.caption("Focused real-time intelligence system for Bitcoin market analysis.")
 
 currency = st.selectbox(
     "Select Currency",
@@ -61,13 +101,8 @@ df = get_latest_prices()
 # Filter Data
 # -------------------------
 
-filter_symbol = st.selectbox(
-    "Filter table by coin",
-    ["all"] + list(df["symbol"].unique())
-)
-
-if filter_symbol != "all":
-    df = df[df["symbol"] == filter_symbol]
+filter_symbol = "bitcoin"
+df = df[df["symbol"] == filter_symbol]
 
 
 # -------------------------
@@ -76,88 +111,107 @@ if filter_symbol != "all":
 
 stats = calculate_stats(df)
 
-news = get_market_news(filter_symbol)
+news = cached_market_news(filter_symbol)
 
 sentiment = calculate_sentiment(news)
 
+alerts = generate_bitcoin_alerts(
+    stats,
+    sentiment,
+    news
+)
+
+focus = build_focus_panel(
+    stats,
+    sentiment,
+    alerts
+)
+
 
 # -------------------------
-# Market Analytics Section
+# Bitcoin Alerts
+# -------------------------
+st.subheader("Bitcoin Alerts")
+
+for alert in alerts:
+
+    level = alert["level"]
+    message = alert["message"]
+
+    if level == "High":
+        st.error(f"{level}: {message}")
+
+    elif level == "Medium":
+        st.warning(f"{level}: {message}")
+
+    else:
+        st.info(f"{level}: {message}")
+
+
+# -------------------------
+# Bitcoin Focus Panel
 # -------------------------
 
-st.subheader("Market Analytics")
+st.subheader("Bitcoin Focus Panel")
 
-col1, col2 = st.columns(2)
+col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Average Price", stats["average"])
-col2.metric("Volatility", stats["volatility"])
+col1.metric("Market Bias", focus["market_bias"])
+col2.metric("News Sentiment", focus["sentiment"])
+col3.metric("Volatility", focus["volatility_state"])
+col4.metric("Critical Alerts", focus["critical_alerts"])
 
-col1.metric("Highest Price", stats["highest"])
-col2.metric("Lowest Price", stats["lowest"])
-
-st.metric("News Sentiment", sentiment)
+with st.expander("View technical analytics"):
+    st.write("Average Price:", stats["average"])
+    st.write("Highest Price:", stats["highest"])
+    st.write("Lowest Price:", stats["lowest"])
+    st.write("Volatility:", stats["volatility"])
+    st.write("Volatility %:", f"{focus['volatility_percent']}%")
 
 
 # -------------------------
 # Market News Section
 # -------------------------
 
-st.subheader("Market News")
+st.subheader("Market News + Impact")
 
 for article in news:
-    st.write("•", article)
+
+    title = article["title"]
+    source = article["source"]
+    credibility = check_news_credibility(source)
+    impact = cached_news_impact(title)
+
+    st.write(f"• {title}")
+    st.caption(f"Source: {source} | Credibility: {credibility}")
+    st.info(impact)
 
 
 # -------------------------
 # AI Market Insight
 # -------------------------
 
-insight = generate_market_insight(
-    stats,
-    filter_symbol
+insight = cached_market_insight(
+    filter_symbol,
+    stats["average"],
+    stats["highest"],
+    stats["lowest"],
+    stats["volatility"]
 )
 
 st.subheader("AI Market Insight")
 st.info(insight)
-
-
-# -------------------------
-# Latest Stored Prices
-# -------------------------
-
-st.subheader("Latest Stored Prices")
-
-st.dataframe(df)
-
-
-# -------------------------
-# Price Trend Chart
-# -------------------------
-
-chart_df = df.sort_values("created_at")
-
-st.subheader("Price Trend")
-
-st.line_chart(
-    chart_df,
-    x="created_at",
-    y="price",
-    color="symbol"
+trader_context = cached_trader_context(
+    stats["average"],
+    stats["highest"],
+    stats["lowest"],
+    stats["volatility"],
+    sentiment,
+    news
 )
 
-
-# -------------------------
-# Download CSV
-# -------------------------
-
-csv = df.to_csv(index=False)
-
-st.download_button(
-    label="Download Data as CSV",
-    data=csv,
-    file_name="crypto_prices.csv",
-    mime="text/csv"
-)
+st.subheader("Trader Context")
+st.warning(trader_context)
 
 
 # -------------------------

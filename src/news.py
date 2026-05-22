@@ -4,18 +4,46 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def is_bitcoin_relevant(title):
+
+    title_lower = title.lower()
+
+    bitcoin_keywords = [
+        "bitcoin",
+        "btc"
+    ]
+
+    reject_keywords = [
+        "ethereum",
+        "eth",
+        "solana",
+        "xrp",
+        "dogecoin",
+        "cardano",
+        "bnb",
+        "shiba"
+    ]
+
+    has_bitcoin_keyword = any(
+        keyword in title_lower for keyword in bitcoin_keywords
+    )
+
+    has_rejected_keyword = any(
+        keyword in title_lower for keyword in reject_keywords
+    )
+
+    if has_bitcoin_keyword and not has_rejected_keyword:
+        return True
+
+    return False
+
+
 def get_market_news(symbol):
 
     api_key = os.getenv("NEWS_API_KEY")
 
-    if symbol == "bitcoin":
-        query = "bitcoin cryptocurrency"
-
-    elif symbol == "ethereum":
-        query = "ethereum cryptocurrency"
-
-    else:
-        query = "cryptocurrency market"
+    query = "bitcoin OR btc"
 
     url = "https://newsapi.org/v2/everything"
 
@@ -23,26 +51,59 @@ def get_market_news(symbol):
         "q": query,
         "language": "en",
         "sortBy": "publishedAt",
-        "pageSize": 5,
+        "pageSize": 20,
         "apiKey": api_key
     }
 
-    response = requests.get(url, params=params)
+    response = requests.get(
+        url,
+        params=params
+    )
+
     response.raise_for_status()
 
     data = response.json()
 
-    articles = data.get("articles", [])
+    articles = data.get(
+        "articles",
+        []
+    )
 
-    news_titles = []
+    news_data = []
 
     for article in articles:
-        title = article.get("title")
 
-        if title:
-            news_titles.append(title)
+        title = article.get(
+            "title",
+            "No title"
+        )
 
-    if not news_titles:
-        return ["No recent news found"]
+        source = article.get(
+            "source",
+            {}
+        ).get(
+            "name",
+            "Unknown"
+        )
 
-    return news_titles
+        if is_bitcoin_relevant(title):
+
+            news_data.append(
+                {
+                    "title": title,
+                    "source": source
+                }
+            )
+
+        if len(news_data) == 5:
+            break
+
+    if not news_data:
+        return [
+            {
+                "title": "No Bitcoin-specific news found at the moment.",
+                "source": "System"
+            }
+        ]
+
+    return news_data
